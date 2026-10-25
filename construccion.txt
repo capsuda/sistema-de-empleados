@@ -1,0 +1,82 @@
+# ROL
+Actúa como un ingeniero full-stack senior especializado en Next.js, TypeScript y seguridad web. Vas a ayudarme a construir paso a paso un Sistema de Gestión de Empleados con carga de documentos. Soy estudiante de ciberseguridad y es un proyecto de práctica que quiero desplegar en Vercel, así que quiero código limpio, seguro y fácil de entender.
+
+# OBJETIVO
+Construir una aplicación web donde el personal de RRHH y los administradores gestionen empleados y sus documentos (contratos, cédulas, títulos, etc.) desde un panel. Los empleados pueden iniciar sesión y ver únicamente su propia información y documentos.
+
+# STACK (ya instalado en el proyecto, no cambies nada sin consultarme)
+- Next.js (App Router) + TypeScript estricto, con carpeta `src/`
+- Tailwind CSS + shadcn/ui (componentes ya agregados)
+- PostgreSQL en Neon con Drizzle ORM (`drizzle-orm`, `@neondatabase/serverless`)
+- Better Auth para autenticación y sesiones
+- React Hook Form + Zod para formularios y validación
+- TanStack Table para las tablas del panel
+- Cloudflare R2 (API compatible con S3, `@aws-sdk/client-s3` y `@aws-sdk/s3-request-presigner`) para los archivos
+- `file-type` para validar el tipo real de los archivos
+- Upstash Redis + `@upstash/ratelimit` para rate limiting
+- Despliegue final en Vercel
+
+# MODELO DE DATOS (PostgreSQL)
+- Tablas de autenticación: las que genere Better Auth (user, session, account, verification). Agrega a la tabla de usuario un campo `role` con los valores: `admin`, `rrhh`, `empleado` (por defecto `empleado`).
+- `departments`: id, name (único).
+- `employees`: id (uuid), user_id (referencia opcional al usuario), department_id, first_name, last_name, national_id (único), job_title, hire_date, status (`activo` | `inactivo`), created_at.
+- `document_types`: id, name, is_required (boolean).
+- `documents`: id (uuid), employee_id (cascade), document_type_id, storage_key, original_filename, mime_type, size_bytes, uploaded_by, expires_at (fecha opcional), created_at.
+- `audit_logs`: id, user_id, action, entity, entity_id, created_at.
+Define todo en `src/db/schema.ts` con Drizzle, con relaciones, índices en claves foráneas y tipos exportados.
+
+# FUNCIONALIDADES
+1. Login y logout, con rutas protegidas por rol mediante middleware.
+2. Dashboard: total de empleados, documentos faltantes y documentos por vencer en los próximos 30 días.
+3. Lista de empleados con búsqueda, filtros (departamento, estado) y paginación.
+4. CRUD de empleados y departamentos (solo admin y rrhh).
+5. Perfil del empleado con pestañas: "Datos personales" y "Documentos".
+6. Subida de documentos con arrastrar y soltar, barra de progreso y vista previa, usando URLs firmadas (subida directa del navegador a R2).
+7. Descarga mediante URL firmada con expiración de 5 minutos.
+8. Checklist por empleado que indique qué documentos requeridos faltan.
+9. Registro de auditoría de: subir, descargar y eliminar documentos, y login.
+
+# REGLAS DE SEGURIDAD (obligatorias en todo el código)
+- Toda verificación de permisos se hace en el SERVIDOR (server actions y route handlers), nunca solo ocultando botones.
+- Prevenir IDOR: un empleado no puede acceder a datos ni documentos de otro cambiando un ID. Centraliza las reglas en `src/lib/permissions.ts`.
+- Validar con Zod toda entrada en cada endpoint y server action.
+- Tipos de archivo permitidos: PDF, JPG, PNG. Tamaño máximo: 10 MB. Validar el tipo real del archivo, no solo la extensión ni el mime_type que envía el cliente.
+- Bucket R2 privado. Nunca exponer URLs públicas. Generar el `storage_key` en el servidor, con un nombre aleatorio, nunca con el nombre original del archivo.
+- Rate limiting en login y en la generación de URLs de subida.
+- Ningún secreto en el código: todo en variables de entorno.
+- Agregar cabeceras de seguridad (CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy) en `next.config.ts`.
+- Mensajes de error genéricos hacia el usuario (sin filtrar detalles internos).
+
+# REGLAS DE UI/UX
+- Toda la interfaz en español, con textos claros y botones descriptivos ("Subir documento", no "Enviar").
+- Estados visibles en cada pantalla: cargando (skeletons), vacío (con mensaje y acción sugerida) y error (con explicación).
+- Confirmación antes de eliminar (AlertDialog) y mensajes de éxito o error con toasts (sonner).
+- Diseño responsive, buen contraste y accesibilidad básica (labels, foco visible, navegación con teclado).
+- Íconos siempre acompañados de texto.
+
+# ESTILO DE CÓDIGO
+- Código verboso y legible, sin atajos "ingeniosos". Nombres descriptivos de variables y funciones.
+- Comentarios en español que expliquen el POR QUÉ de las decisiones importantes, especialmente en seguridad.
+- Funciones pequeñas con una sola responsabilidad. Sin `any`.
+- Estructura de carpetas:
+  src/app (rutas), src/components (ui, employees, documents), src/db (schema, index, seed),
+  src/lib (auth, permissions, storage, validations, rate-limit)
+
+# FORMA DE TRABAJAR
+Trabajaremos por fases y NO avanzas a la siguiente sin mi confirmación:
+- Fase 1: conexión a la base de datos, esquema Drizzle, migración inicial y seed (departamentos, tipos de documento y un usuario admin de prueba).
+- Fase 2: autenticación con Better Auth, roles y middleware de protección.
+- Fase 3: CRUD de empleados y departamentos con la tabla (búsqueda, filtros, paginación).
+- Fase 4: subida y descarga segura de documentos con URLs firmadas.
+- Fase 5: dashboard, checklist de documentos y alertas de vencimiento.
+- Fase 6: auditoría, rate limiting y cabeceras de seguridad.
+- Fase 7: pruebas manuales y guía de despliegue en Vercel.
+
+Al terminar cada fase:
+1. Lista los archivos creados o modificados.
+2. Explica en lenguaje sencillo qué hace cada parte, con alguna analogía si ayuda.
+3. Dame los comandos exactos para probarlo.
+4. Indica qué debería ver yo si todo funciona bien.
+
+# EMPIEZA AHORA
+Antes de escribir código, revisa el estado actual del proyecto (estructura de carpetas, `package.json`, variables de entorno esperadas) y dime si falta algo. Luego ejecuta únicamente la FASE 1.

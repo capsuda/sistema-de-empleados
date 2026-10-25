@@ -1,0 +1,167 @@
+1. Requisitos previos
+
+Instala esto una sola vez:
+
+Node.js 22 LTS: https://nodejs.org
+Git: https://git-scm.com
+pnpm (gestor de paquetes, más rápido que npm)
+Cuentas gratuitas en: GitHub, Vercel, Neon (base de datos), Cloudflare (R2) y Upstash (rate limiting)
+bash
+# Verifica versiones
+node -v        # debe mostrar v22.x o superior
+git --version
+
+# Instala pnpm
+npm install -g pnpm
+pnpm -v
+2. Crear el proyecto
+bash
+pnpm create next-app@latest gestion-empleados \
+  --typescript \
+  --tailwind \
+  --eslint \
+  --app \
+  --src-dir \
+  --import-alias "@/*" \
+  --use-pnpm
+
+cd gestion-empleados
+3. Inicializar shadcn/ui y agregar componentes
+bash
+pnpm dlx shadcn@latest init
+
+pnpm dlx shadcn@latest add button input label card table dialog \
+  alert-dialog dropdown-menu select badge tabs form sonner \
+  skeleton avatar separator sheet progress checkbox textarea
+4. Dependencias de producción
+bash
+# Base de datos y ORM
+pnpm add drizzle-orm @neondatabase/serverless
+
+# Autenticación
+pnpm add better-auth
+
+# Formularios y validación
+pnpm add react-hook-form @hookform/resolvers zod
+
+# Tabla del panel
+pnpm add @tanstack/react-table
+
+# Archivos: R2 usa la API compatible con S3
+pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+
+# Validar el tipo real del archivo (por su contenido, no su extensión)
+pnpm add file-type
+
+# Rate limiting
+pnpm add @upstash/ratelimit @upstash/redis
+
+# Utilidades
+pnpm add date-fns lucide-react
+5. Dependencias de desarrollo
+bash
+pnpm add -D drizzle-kit tsx dotenv
+6. Scripts de package.json
+
+Agrega esto dentro de "scripts":
+
+json
+{
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts"
+  }
+}
+7. Variables de entorno
+
+Crea el archivo .env.local (Next.js ya lo ignora en Git, pero confirma que .gitignore incluya .env*):
+
+bash
+# Base de datos (Neon: Dashboard > Connection string)
+DATABASE_URL="postgresql://usuario:clave@host.neon.tech/neondb?sslmode=require"
+
+# Better Auth
+BETTER_AUTH_SECRET="genera-uno-con-el-comando-de-abajo"
+BETTER_AUTH_URL="http://localhost:3000"
+
+# Cloudflare R2
+R2_ACCOUNT_ID="tu-account-id"
+R2_ACCESS_KEY_ID="tu-access-key"
+R2_SECRET_ACCESS_KEY="tu-secret-key"
+R2_BUCKET_NAME="documentos-empleados"
+
+# Upstash Redis
+UPSTASH_REDIS_REST_URL="https://xxxx.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="tu-token"
+
+Para generar el secreto:
+
+bash
+openssl rand -base64 32
+8. Configuración de Drizzle
+
+Crea drizzle.config.ts en la raíz del proyecto:
+
+typescript
+import { defineConfig } from "drizzle-kit";
+import * as dotenv from "dotenv";
+
+// Carga las variables de .env.local para que drizzle-kit las pueda leer
+dotenv.config({ path: ".env.local" });
+
+export default defineConfig({
+  schema: "./src/db/schema.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+});
+9. Configurar CORS en el bucket de R2
+
+Sin esto, el navegador no podrá subir archivos directamente con URLs firmadas. En Cloudflare ve a R2 > tu bucket > Settings > CORS Policy y pega:
+
+json
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "https://tu-proyecto.vercel.app"
+    ],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+
+Mantén el bucket privado (no actives el acceso público).
+
+10. Git y Vercel
+bash
+git init
+git add .
+git commit -m "chore: proyecto base"
+
+# Crea un repositorio vacío en GitHub y luego:
+git remote add origin https://github.com/TU_USUARIO/gestion-empleados.git
+git branch -M main
+git push -u origin main
+
+# Vercel CLI (opcional, también puedes importar desde el panel web)
+pnpm add -g vercel
+vercel login
+vercel link
+vercel env pull .env.local
+11. Probar que todo funciona
+bash
+pnpm dev
+
+Abre http://localhost:3000. Si ves la página de Next.js, el entorno está listo.
